@@ -6,63 +6,69 @@ import struct
 import socket
 
 def connect():
-	host=socket.gethostbyname('openbarrage.douyutv.com')
-	port=8601
+	host=socket.gethostbyname('danmu.douyu.com')
+	port=8602
 	global client
 	client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 	client.connect((host,port))
 
-def send_msg(msg):
-	data_length=len(msg)-8
+def send_msg(msgstr):
+	msg=msgstr.encode('utf-8')
+	data_length=len(msgstr)+8
 	code=689
-	msgHead=struct.pack('<i',data_length)\
-		+struct.pack('<i',data_length)+struct.pack('<i',code)
+	msgHead=int.to_bytes(data_length,4,'little')+int.to_bytes(data_length,4,'little')+int.to_bytes(code,4,'little')
 	client.send(msgHead)
-	print(msgHead)
-	send=0
-	while send<len(msg):
-		tn=client.send(msg[send:])
-		send=send+tn
+	client.send(msg)
 
 def receive_danmu(room_id):
-	login ='type@loginreq/roomid@%s/\0'%room_id
-	login=login.encode('utf-8')
+	login ='type@=loginreq/roomid@=%s/\0'%room_id
 	print(login)
 	send_msg(login)
+	time.sleep(1)
 	joingroup='type@=joingroup/rid@=%s/gid@=-9999/\0'%room_id
-	joingroup=joingroup.encode('utf-8')
 	print(joingroup)
 	send_msg(joingroup)
+	time.sleep(1)
+
 	while True:
 		content = client.recv(1024)
-		print(content)
+		time.sleep(0.1)
 		if judge_chatmsg(content):
 			nickname=nick_name(content)
 			chatmsg=chat_msg(content)
-			print('[danmu]%s:%s')%(nickname,chatmsg)
+			print('[danmu]%s:%s'%(nickname,chatmsg))
 		else:
 			pass
 
 def nick_name(content):
-	pattern=re.compile(r'nn@=(.+*)/')		
-	nick_name=pattern.findall(content[0])
-	return nick_name
+	pattern=b'nn@=(.*?)/'	
+	#print('nickname:%s'%pattern)	
+	nick_name=re.findall(pattern,content)	
+
+	if(len(nick_name)>0):
+		return nick_name[0].decode('utf-8')
+	else:	
+		return nick_name	
 
 def chat_msg(content):
-	pattern=re.compile(r'txt@=(.*)/')
-	chatmsg=pattern.findall(content[0])
-	return chatmsg	
+	pattern=b'txt@=(.*?)/'
+	#print('msg:%s'%pattern)	
+	chatmsg=re.findall(pattern,content)
+	msglen =len(chatmsg)
+	#print(msglen)
+	if(msglen>0):
+		return chatmsg[0].decode('utf-8')
+	else:			
+		return chatmsg	
 
 def judge_chatmsg(content):
-	pattern=re.compile(r'type@=(.*)/rid@')
-	print(content,'pd')
+	pattern=re.compile(b'type@=(.*)/rid@')		
 	data_type=pattern.findall(content)
+
 	try:
-		if data_type[0]=='chatmsg':
-			print('true')  
+		if data_type[0]==b'chatmsg':			 
 			return True
 		else:
-			print('false')  
 			return False 
 	except Exception as e:
 		return	False
@@ -70,4 +76,4 @@ def judge_chatmsg(content):
 
 if __name__ == '__main__':
 	connect()
-	receive_danmu(1972046)
+	receive_danmu(9999)
